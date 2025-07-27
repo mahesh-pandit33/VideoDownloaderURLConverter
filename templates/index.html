@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video Downloader</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&display=swap');
+
+    body {
+      margin: 0;
+      padding: 0;
+      padding-top: 68px; /* Space for fixed header */
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      font-family: 'Poppins', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      color: #fff;
+      overflow-y: auto; /* Enable vertical scrolling */
+    }
+
+    /* Header Bar */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(90deg, #4e54c8, #8f94fb);
+      padding: 20px 0;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: white;
+      user-select: none;
+      font-family: 'Poppins', sans-serif;
+      margin: 0; /* Remove margin-bottom */
+      z-index: 1000; /* Stay above other content */
+    }
+
+    .container {
+      background: rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      padding: 30px 40px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      flex-shrink: 0;
+    }
+
+    .container h1 {
+      margin-bottom: 20px;
+      font-size: 2rem;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 12px 15px;
+      margin: 15px 0;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 10px;
+      background: #00c6ff;
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+      color: white;
+      cursor: pointer;
+      transition: 0.3s ease;
+      width: 100%;
+    }
+
+    button:hover {
+      background: linear-gradient(to right, #005de7, #00aee5);
+    }
+
+    .footer {
+      margin-top: 20px;
+      font-size: 0.85rem;
+      opacity: 0.7;
+    }
+
+    #progressText {
+      margin-top: 15px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-left: 10px;
+      visibility: hidden;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 500px) {
+      .container {
+        padding: 20px;
+      }
+    }
+    
+    input[name="url"] {
+      display: block;
+      width: calc(100% - 10px);
+      margin-right: 20px;
+      margin-left: 0;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Video Downloader</header>
+
+  <p style="margin: 20px; padding: 10px;">
+    Free online video downloader for Youtube & Instagram/Facebook
+  </p>
+
+  <div class="container">
+    <h1>📥 Video Downloader</h1>
+    <form id="downloadForm">
+      <input type="text" name="url" placeholder="Paste YouTube/Instagram URL" required />
+      <select name="format" required>
+        <option value="mp4">🎬 MP4 (Video)</option>
+        <option value="mp3">🎧 MP3 (Audio)</option>
+      </select>
+      <button type="submit">Download</button>
+    </form>
+    <div id="progressText">
+      <span id="progressMessage"></span>
+      <span class="spinner" id="spinner"></span>
+    </div>
+    <div class="footer">
+      Supports YouTube Shorts, Reels, Instagram Reels, Facebook
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('downloadForm');
+    const progressText = document.getElementById('progressText');
+    const progressMessage = document.getElementById('progressMessage');
+    const spinner = document.getElementById('spinner');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Show downloading message and spinner
+      progressMessage.textContent = 'Downloading...Please wait..!';
+      spinner.style.visibility = 'visible';
+
+      const formData = new FormData(form);
+      const response = await fetch('/download', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        progressMessage.textContent = '❌ Download failed.';
+        spinner.style.visibility = 'hidden';
+        return;
+      }
+
+      const contentLength = response.headers.get('Content-Length');
+      const total = contentLength ? parseInt(contentLength, 10) : null;
+
+      const reader = response.body.getReader();
+      let receivedLength = 0;
+      const chunks = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        receivedLength += value.length;
+
+        if (total) {
+          const percent = ((receivedLength / total) * 100).toFixed(1);
+          progressMessage.textContent = `📥 Downloaded: ${percent}%`;
+        } else {
+          progressMessage.textContent = `📥 Downloaded: ${receivedLength} bytes`;
+        }
+      }
+
+      const blob = new Blob(chunks);
+      let filename = 'video';
+      const disposition = response.headers.get('Content-Disposition');
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?(.+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(link.href);
+
+      progressMessage.textContent = '✅ Download complete!';
+      spinner.style.visibility = 'hidden';
+    });
+  </script>
+</body>
+</html>
